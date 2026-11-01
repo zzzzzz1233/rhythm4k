@@ -23,6 +23,15 @@ const PAD_TEX_IDLE := "res://assets/pads/pad_idle.png"
 const PAD_TEX_PRESS := "res://assets/pads/pad_press.png"
 const COMBO_YELLOW_THRESHOLD := 40
 const PAD_SIZE_RATIO := 1.05
+const LANE_STRIPES := 3
+const LANE_STRIPE_SPAN := 0.25
+const LANE_STRIPE_COLORS := [
+	Color(0.0, 0.0, 0.0, 0.85),
+	Color(1.0, 1.0, 1.0, 0.72),
+	Color(0.0, 0.0, 0.0, 0.85),
+]
+const GAME_BG_TEX := "res://assets/backgrounds/game_bg.jpg"
+const GAME_BG_ALPHA := 0.4
 
 const HIT_WINDOW := 0.20
 const W_PERFECT := 0.06
@@ -72,10 +81,9 @@ var _drag_y := [0.0, 0.0, 0.0, 0.0]
 var _touch_lane := {}
 var _miss_flash := 0.0
 
-var _lane_polys: Array = []
+var _lane_stripes: Array = []
 var _lane_top_points: Array = []
 var _lane_bottom_points: Array = []
-var _lane_lines: Array = []
 var _pads: Array = []
 var _note_pool: Array = []
 var _lane_tails: Array = []
@@ -128,7 +136,7 @@ var _popup_label: Label
 
 func _ready() -> void:
 	Engine.max_fps = 0
-	Input.set_emulate_mouse_from_touch(false)
+	Input.set_emulate_mouse_from_touch(true)
 	scroll_speed_multiplier = GameConfig.scroll_speed_multiplier
 	track_width_ratio = GameConfig.track_width_ratio
 	audio_offset = GameConfig.audio_offset
@@ -140,8 +148,12 @@ func _ready() -> void:
 	_load_pad_textures()
 	_prewarm_notes(128)
 	_disc_tex = _make_disc_texture(128)
-	if background_texture != null:
-		_bg.texture = background_texture
+	var bg_tex: Texture2D = background_texture
+	if bg_tex == null:
+		bg_tex = load(GAME_BG_TEX)
+	if bg_tex != null:
+		_bg.texture = bg_tex
+		_bg.modulate = Color(1.0, 1.0, 1.0, GAME_BG_ALPHA)
 	_build_lanes()
 	_build_effect_pool()
 	_build_hud()
@@ -287,20 +299,14 @@ func _prewarm_notes(count: int) -> void:
 
 func _build_lanes() -> void:
 	for i in range(LANES):
-		var poly := Polygon2D.new()
-		poly.name = "Lane%d" % i
-		poly.color = Color(lane_colors[i].r, lane_colors[i].g, lane_colors[i].b, 0.06)
-		_lane_layer.add_child(poly)
-		_lane_polys.append(poly)
-
-	for i in range(LANES + 1):
-		var boundary := Line2D.new()
-		boundary.name = "Boundary%d" % i
-		boundary.width = 2.0
-		boundary.default_color = Color(1, 1, 1, 0.10)
-		boundary.antialiased = true
-		_lane_layer.add_child(boundary)
-		_lane_lines.append(boundary)
+		for s in range(LANE_STRIPES):
+			var stripe := Polygon2D.new()
+			stripe.name = "Lane%dStripe%d" % [i, s]
+			stripe.color = LANE_STRIPE_COLORS[s]
+			stripe.antialiased = true
+			stripe.z_index = -100
+			_lane_layer.add_child(stripe)
+			_lane_stripes.append(stripe)
 
 	for i in range(LANES):
 		var pad := Sprite2D.new()
@@ -518,6 +524,8 @@ func _gui_input(event: InputEvent) -> void:
 			_track_drag(lane, event.relative.y)
 		accept_event()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.device == InputEvent.DEVICE_ID_EMULATION:
+			return
 		var lane := _lane_at_position(event.position)
 		_drag_y[lane] = 0.0
 		if event.pressed:
@@ -526,6 +534,8 @@ func _gui_input(event: InputEvent) -> void:
 			_release_lane(lane)
 		accept_event()
 	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		if event.device == InputEvent.DEVICE_ID_EMULATION:
+			return
 		var lane := _lane_at_position(event.position)
 		_track_drag(lane, event.relative.y)
 		accept_event()
@@ -663,7 +673,7 @@ func _update_note_nodes() -> void:
 		if n.node == null:
 			n.node = _spawn_note(n)
 		n.node.position = _lane_point(y, n.lane)
-		n.node.set_note_diameter((_track_width_at(y) / 4.0) * 0.72)
+		n.node.set_note_diameter((_track_width_at(y) / 4.0) * 0.9)
 		n.node.set_tail_length(0.0)
 		n.node.hide_tail_immediate()
 		if n.state == 3:
@@ -748,8 +758,8 @@ func _update_pads() -> void:
 		if tex_w <= 0.0:
 			continue
 		var base := pad_diameter / tex_w
-		_pads[i].modulate = Color(1.0, 1.0, 1.0, 0.30 + 0.70 * fl)
-		_pads[i].scale = Vector2.ONE * base * (1.0 + 0.10 * fl)
+		_pads[i].modulate = Color(1.0, 1.0, 1.0, 1.0)
+		_pads[i].scale = Vector2.ONE * base * (1.0 + 0.08 * fl)
 
 func _update_popup() -> void:
 	if _popup_label == null:
@@ -1006,11 +1016,21 @@ func _build_pause_panel() -> void:
 	_pause_panel.add_child(bg)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
+	var margin := MarginContainer.new()
+	_pause_panel.add_child(margin)
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 48)
+	margin.add_theme_constant_override("margin_right", 48)
+	margin.add_theme_constant_override("margin_top", 24)
+	margin.add_theme_constant_override("margin_bottom", 24)
+
 	var center := CenterContainer.new()
-	_pause_panel.add_child(center)
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_child(center)
 
 	var col := VBoxContainer.new()
+	col.custom_minimum_size = Vector2(560, 0)
+	col.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 14)
 	center.add_child(col)
 
@@ -1031,7 +1051,7 @@ func _build_pause_panel() -> void:
 	_slider.min_value = 0.0
 	_slider.max_value = 28.0
 	_slider.step = 0.1
-	_slider.custom_minimum_size = Vector2(420, 40)
+	_slider.custom_minimum_size = Vector2(520, 56)
 	_slider.focus_mode = Control.FOCUS_NONE
 	_slider.set_value_no_signal(scroll_speed_multiplier)
 	_slider.value_changed.connect(_on_speed_changed)
@@ -1049,7 +1069,7 @@ func _build_pause_panel() -> void:
 	width_slider.min_value = 0.4
 	width_slider.max_value = 1.0
 	width_slider.step = 0.02
-	width_slider.custom_minimum_size = Vector2(420, 40)
+	width_slider.custom_minimum_size = Vector2(520, 56)
 	width_slider.focus_mode = Control.FOCUS_NONE
 	width_slider.set_value_no_signal(track_width_ratio)
 	width_slider.value_changed.connect(_on_track_width_changed)
@@ -1069,7 +1089,7 @@ func _build_pause_panel() -> void:
 	offset_slider.min_value = -0.2
 	offset_slider.max_value = 0.2
 	offset_slider.step = 0.01
-	offset_slider.custom_minimum_size = Vector2(420, 40)
+	offset_slider.custom_minimum_size = Vector2(520, 56)
 	offset_slider.focus_mode = Control.FOCUS_NONE
 	offset_slider.set_value_no_signal(audio_offset)
 	offset_slider.value_changed.connect(_on_audio_offset_changed)
@@ -1292,10 +1312,10 @@ func _apply_layout() -> void:
 	_acc_label.add_theme_font_size_override("font_size", int(_px(22)))
 	_pause_btn.anchor_left = 1.0
 	_pause_btn.anchor_right = 1.0
-	_pause_btn.offset_left = -_px(118)
+	_pause_btn.offset_left = -_px(132)
 	_pause_btn.offset_right = -_px(18)
 	_pause_btn.offset_top = _px(12)
-	_pause_btn.offset_bottom = _px(12) + _px(46)
+	_pause_btn.offset_bottom = _px(12) + _px(72)
 	_pause_btn.add_theme_font_size_override("font_size", int(_px(20)))
 	_popup_label.offset_top = _hit_y() - _px(150)
 	_popup_label.offset_bottom = _hit_y() - _px(90)
@@ -1320,13 +1340,14 @@ func _apply_layout() -> void:
 	_miss_edges[3].size = Vector2(e, size.y)
 
 func _update_track_geometry() -> void:
-	if _lane_polys.is_empty():
+	if _lane_stripes.is_empty():
 		return
 	var h := size.y
 	var bottom := _track_width_at(h)
 	var top := _track_width_at(0.0)
 	var bleft := size.x * 0.5 - bottom * 0.5
 	var tleft := size.x * 0.5 - top * 0.5
+	var hy := _hit_y()
 	_lane_top_points.clear()
 	_lane_bottom_points.clear()
 	for i in range(LANES):
@@ -1334,23 +1355,21 @@ func _update_track_geometry() -> void:
 		_lane_top_points.append(Vector2(tleft + top * lt, 0.0))
 		_lane_bottom_points.append(Vector2(bleft + bottom * lt, h))
 	for i in range(LANES):
-		var t0 := float(i) / float(LANES)
-		var t1 := float(i + 1) / float(LANES)
-		var poly: Polygon2D = _lane_polys[i]
-		poly.polygon = PackedVector2Array([
-			Vector2(tleft + top * t0, 0.0),
-			Vector2(tleft + top * t1, 0.0),
-			Vector2(bleft + bottom * t1, h),
-			Vector2(bleft + bottom * t0, h),
-		])
-	for i in range(LANES + 1):
-		var t := float(i) / float(LANES)
-		var line: Line2D = _lane_lines[i]
-		line.points = PackedVector2Array([
-			Vector2(tleft + top * t, 0.0),
-			Vector2(bleft + bottom * t, h),
-		])
-	var hy := _hit_y()
+		var lane_t0 := float(i) / float(LANES)
+		var lane_t1 := float(i + 1) / float(LANES)
+		var center_t := (lane_t0 + lane_t1) * 0.5
+		var half_t := (lane_t1 - lane_t0) * LANE_STRIPE_SPAN * 0.5
+		var step_t := half_t * 2.0 / float(LANE_STRIPES)
+		for s in range(LANE_STRIPES):
+			var a := center_t - half_t + step_t * float(s)
+			var b := a + step_t
+			var poly: Polygon2D = _lane_stripes[i * LANE_STRIPES + s]
+			poly.polygon = PackedVector2Array([
+				Vector2(tleft + top * a, 0.0),
+				Vector2(tleft + top * b, 0.0),
+				Vector2(bleft + bottom * b, h),
+				Vector2(bleft + bottom * a, h),
+			])
 	for i in range(LANES):
 		_pads[i].position = _lane_point(hy, i)
 	_hit_line.position = Vector2(0.0, hy - _px(2.0))

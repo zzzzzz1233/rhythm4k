@@ -6,6 +6,8 @@ extends Control
 const GAME_SCENE := "res://Game.tscn"
 const DIFF_CARD := "res://DiffCard.tscn"
 const DIAGONAL_BG := "res://diagonal_bg.gd"
+const GAME_BG_TEX := "res://assets/backgrounds/game_bg.jpg"
+const GAME_BG_ALPHA := 0.4
 
 const BG := Color("#0a0d13")
 const TEXT := Color("#e8eefc")
@@ -88,6 +90,17 @@ func _make_root(node_name: String) -> Control:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(bg)
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var bg_tex: Texture2D = load(GAME_BG_TEX)
+	if bg_tex != null:
+		var bg_image := TextureRect.new()
+		bg_image.name = "BgImage"
+		bg_image.texture = bg_tex
+		bg_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bg_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		bg_image.modulate = Color(1.0, 1.0, 1.0, GAME_BG_ALPHA)
+		bg_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(bg_image)
+		bg_image.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	return root
 
 
