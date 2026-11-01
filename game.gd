@@ -70,6 +70,7 @@ var _lane_lines: Array = []
 var _pads: Array = []
 var _note_pool: Array = []
 var _lane_tails: Array = []
+var _last_press_msec := [-1000, -1000, -1000, -1000]
 var _fx: Array = []
 var _fx_life: Array = []
 var _fx_color: Array = []
@@ -114,6 +115,7 @@ var _popup_label: Label
 
 func _ready() -> void:
 	Engine.max_fps = 0
+	Input.set_emulate_mouse_from_touch(false)
 	scroll_speed_multiplier = GameConfig.scroll_speed_multiplier
 	track_width_ratio = GameConfig.track_width_ratio
 	_current_speed = scroll_speed_multiplier
@@ -424,7 +426,8 @@ func _should_finish() -> bool:
 		return false
 	if _notes.is_empty() or _last_note_end <= 0.0:
 		return false
-	if _song_time > _last_note_end + 2.0:
+	if _song_time > _last_note_end + 15.0:
+		push_warning("Song finish safety net triggered at %.2fs" % _song_time)
 		return true
 	if _player != null and _player.playing:
 		return false
@@ -528,18 +531,22 @@ func _flick_lane(lane: int) -> void:
 	_flick_hold(best)
 
 func _press_lane(lane: int) -> void:
+	var now := Time.get_ticks_msec()
+	if now - int(_last_press_msec[lane]) < 25:
+		return
+	_last_press_msec[lane] = now
 	_held[lane] = true
 	_flash[lane] = 1.0
 	_pulse_hit_line(lane)
 	if _paused or _finished:
 		return
 	var best = null
-	var best_dt := HIT_WINDOW
+	var best_dt := HIT_WINDOW + 1.0
 	for n in _notes:
 		if n.lane != lane or n.state != 0:
 			continue
 		var dt: float = absf(_song_time - n.t)
-		if dt <= best_dt:
+		if dt <= HIT_WINDOW and dt < best_dt:
 			best_dt = dt
 			best = n
 	if best == null:
