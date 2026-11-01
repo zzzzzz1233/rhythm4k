@@ -14,6 +14,7 @@ var last_difficulty := ""
 
 var scroll_speed_multiplier := 6.0
 var track_width_ratio := 0.72
+var audio_offset := 0.0
 
 
 func _ready() -> void:
@@ -28,6 +29,7 @@ func load_settings() -> void:
 		return
 	scroll_speed_multiplier = clampf(float(cfg.get_value("game", "scroll_speed", 6.0)), 0.0, 28.0)
 	track_width_ratio = clampf(float(cfg.get_value("game", "track_width", 0.72)), 0.4, 1.0)
+	audio_offset = clampf(float(cfg.get_value("game", "audio_offset", 0.0)), -0.2, 0.2)
 	player_name = str(cfg.get_value("game", "player_name", player_name))
 
 
@@ -35,6 +37,7 @@ func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("game", "scroll_speed", scroll_speed_multiplier)
 	cfg.set_value("game", "track_width", track_width_ratio)
+	cfg.set_value("game", "audio_offset", audio_offset)
 	cfg.set_value("game", "player_name", player_name)
 	var err := cfg.save(SETTINGS_PATH)
 	if err != OK:

@@ -16,6 +16,14 @@ const FLICK_DISTANCE := 64.0
 const TOP_TAPER := 0.24
 const NOTE_SCENE := "res://Note.tscn"
 
+const NOTE_TEX_DIR := "res://assets/notes/"
+const NOTE_TEX_FILES := ["note_blue.png", "note_green.png", "note_orange.png", "note_purple.png", "note_red.png"]
+const NOTE_TEX_YELLOW := "res://assets/notes/note_yellow.png"
+const PAD_TEX_IDLE := "res://assets/pads/pad_idle.png"
+const PAD_TEX_PRESS := "res://assets/pads/pad_press.png"
+const COMBO_YELLOW_THRESHOLD := 40
+const PAD_SIZE_RATIO := 1.05
+
 const HIT_WINDOW := 0.20
 const W_PERFECT := 0.06
 const W_GREAT := 0.12
@@ -41,6 +49,7 @@ const W_GOOD := 0.20
 
 var scroll_speed_multiplier := 5.0
 var track_width_ratio := 0.6
+var audio_offset := 0.0
 var _current_speed := 5.0
 
 var _notes: Array = []
@@ -80,7 +89,11 @@ var _lead_start_usec := 0
 var _hit_line: ColorRect
 var _miss_edges: Array = []
 var _note_scene: PackedScene
-var _ring_tex: ImageTexture
+var _note_textures: Array = []
+var _note_yellow: Texture2D
+var _yellow_mode := false
+var _pad_idle: Texture2D
+var _pad_press: Texture2D
 var _disc_tex: ImageTexture
 
 var _score := 0
@@ -118,13 +131,15 @@ func _ready() -> void:
 	Input.set_emulate_mouse_from_touch(false)
 	scroll_speed_multiplier = GameConfig.scroll_speed_multiplier
 	track_width_ratio = GameConfig.track_width_ratio
+	audio_offset = GameConfig.audio_offset
 	_current_speed = scroll_speed_multiplier
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_ALL
 	_note_scene = load(NOTE_SCENE)
+	_load_note_textures()
+	_load_pad_textures()
 	_prewarm_notes(128)
 	_disc_tex = _make_disc_texture(128)
-	_ring_tex = _make_ring_texture(160)
 	if background_texture != null:
 		_bg.texture = background_texture
 	_build_lanes()
@@ -177,6 +192,10 @@ func _load_chart(path: String) -> void:
 		return
 	var meta: Dictionary = data.get("metadata", {})
 	_song_title = str(meta.get("title_unicode", meta.get("title", "")))
+	if meta.has("offset"):
+		audio_offset = clampf(float(meta.get("offset", 0.0)), -0.2, 0.2)
+		GameConfig.audio_offset = audio_offset
+		GameConfig.save_settings()
 	var arr: Array = data.get("notes", [])
 	for item in arr:
 		if not item is Dictionary:
@@ -188,7 +207,7 @@ func _load_chart(path: String) -> void:
 		var hold := 0.0
 		if typ == "hold" and end_t > t:
 			hold = end_t - t
-		_notes.append({"t": t, "lane": lane, "hold": hold, "state": 0, "dt": 0.0, "node": null, "hold_active": false, "flicked": false, "tail_line": null})
+		_notes.append({"t": t, "lane": lane, "hold": hold, "state": 0, "dt": 0.0, "node": null, "hold_active": false, "flicked": false, "tail_line": null, "tex": randi() % NOTE_TEX_FILES.size()})
 		_last_note_end = maxf(_last_note_end, t + hold)
 	print("Chart loaded: %s  notes=%d  last=%.2fs" % [path, _notes.size(), _last_note_end])
 
@@ -224,6 +243,38 @@ func _load_audio(path: String) -> void:
 	print("Audio loaded: %s  length=%.2fs" % [path, stream.get_length()])
 
 
+func _load_note_textures() -> void:
+	_note_textures.clear()
+	for file_name in NOTE_TEX_FILES:
+		var tex: Texture2D = load(NOTE_TEX_DIR + file_name)
+		if tex != null:
+			_note_textures.append(tex)
+	_note_yellow = load(NOTE_TEX_YELLOW)
+
+
+func _load_pad_textures() -> void:
+	_pad_idle = load(PAD_TEX_IDLE)
+	_pad_press = load(PAD_TEX_PRESS)
+
+
+func _texture_for(n) -> Texture2D:
+	if _yellow_mode:
+		return _note_yellow
+	if _note_textures.is_empty():
+		return null
+	return _note_textures[int(n.tex) % _note_textures.size()]
+
+
+func _update_note_textures() -> void:
+	var want_yellow := _combo >= COMBO_YELLOW_THRESHOLD
+	if want_yellow == _yellow_mode:
+		return
+	_yellow_mode = want_yellow
+	for n in _notes:
+		if n.node != null:
+			n.node.set_note_texture(_texture_for(n))
+
+
 func _prewarm_notes(count: int) -> void:
 	if _note_scene == null:
 		return
@@ -254,7 +305,7 @@ func _build_lanes() -> void:
 	for i in range(LANES):
 		var pad := Sprite2D.new()
 		pad.name = "Pad%d" % i
-		pad.texture = pad_texture if pad_texture != null else _ring_tex
+		pad.texture = pad_texture if pad_texture != null else _pad_idle
 		pad.modulate = lane_colors[i]
 		_lane_layer.add_child(pad)
 		_pads.append(pad)
@@ -408,6 +459,7 @@ func _physics_process(delta: float) -> void:
 	_miss_flash = maxf(0.0, _miss_flash - delta * 2.5)
 	_popup_left = maxf(0.0, _popup_left - delta)
 
+	_update_note_textures()
 	_update_notes()
 	_update_note_nodes()
 	_update_pads()
@@ -440,7 +492,8 @@ func _audio_time() -> float:
 	var t := _player.get_playback_position()
 	t += AudioServer.get_time_since_last_mix()
 	t -= AudioServer.get_output_latency()
-	return maxf(0.0, t)
+	t += audio_offset
+	return maxf(-1.0, t)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -653,8 +706,10 @@ func _spawn_note(n) -> Node2D:
 			return null
 		node = _note_scene.instantiate()
 		_note_layer.add_child(node)
-	if note_texture != null and "note_texture" in node:
-		node.note_texture = note_texture
+	if node.has_method("set_note_texture"):
+		node.set_note_texture(_texture_for(n))
+	if node.has_method("set_mirror"):
+		node.set_mirror(n.lane >= LANES / 2)
 	if tail_texture != null and "tail_texture" in node:
 		node.tail_texture = tail_texture
 	node.setup(lane_colors[n.lane], n.hold)
@@ -678,17 +733,22 @@ func _release_note(node: Node2D) -> void:
 
 
 func _update_pads() -> void:
-	var pad_diameter := (_track_width_at(_hit_y()) / 4.0) * 0.78
+	var pad_diameter := (_track_width_at(_hit_y()) / float(LANES)) * PAD_SIZE_RATIO
 	for i in range(LANES):
 		if _pads[i].texture == null:
 			continue
+		var fl: float = _flash[i]
+		var active: bool = _held[i] or _hold_active[i] or fl > 0.05
+		var want: Texture2D = _pad_idle
+		if active and _pad_press != null:
+			want = _pad_press
+		if want != null and _pads[i].texture != want:
+			_pads[i].texture = want
 		var tex_w := float(_pads[i].texture.get_width())
 		if tex_w <= 0.0:
 			continue
-		var fl: float = _flash[i]
 		var base := pad_diameter / tex_w
-		var c: Color = lane_colors[i]
-		_pads[i].modulate = Color(c.r, c.g, c.b, 0.30 + 0.70 * fl)
+		_pads[i].modulate = Color(1.0, 1.0, 1.0, 0.30 + 0.70 * fl)
 		_pads[i].scale = Vector2.ONE * base * (1.0 + 0.10 * fl)
 
 func _update_popup() -> void:
@@ -716,7 +776,7 @@ func _build_effect_pool() -> void:
 	for i in 24:
 		var s := Sprite2D.new()
 		s.name = "Fx%d" % i
-		s.texture = hit_texture if hit_texture != null else _ring_tex
+		s.texture = hit_texture
 		s.visible = false
 		s.z_index = 4
 		_effect_layer.add_child(s)
@@ -996,6 +1056,25 @@ func _build_pause_panel() -> void:
 	col.add_child(width_slider)
 
 
+	var offset_label := Label.new()
+	offset_label.name = "OffsetLabel"
+	offset_label.text = "AUDIO OFFSET  %+.2fs" % audio_offset
+	offset_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	offset_label.add_theme_font_size_override("font_size", 20)
+	offset_label.add_theme_color_override("font_color", Color("#9fb0c9"))
+	col.add_child(offset_label)
+
+	var offset_slider := HSlider.new()
+	offset_slider.name = "OffsetSlider"
+	offset_slider.min_value = -0.2
+	offset_slider.max_value = 0.2
+	offset_slider.step = 0.01
+	offset_slider.custom_minimum_size = Vector2(420, 40)
+	offset_slider.focus_mode = Control.FOCUS_NONE
+	offset_slider.set_value_no_signal(audio_offset)
+	offset_slider.value_changed.connect(_on_audio_offset_changed)
+	col.add_child(offset_slider)
+
 	var resume := _make_button("CONTINUE", 22)
 	resume.pressed.connect(_resume)
 	col.add_child(resume)
@@ -1073,6 +1152,19 @@ func _on_track_width_changed(value: float) -> void:
 	_update_track_geometry()
 
 
+func _on_audio_offset_changed(value: float) -> void:
+	if not _paused:
+		return
+	var delta_offset := value - audio_offset
+	audio_offset = clampf(value, -0.2, 0.2)
+	_song_time += delta_offset
+	GameConfig.audio_offset = audio_offset
+	GameConfig.save_settings()
+	var label := _pause_panel.find_child("OffsetLabel", true, false) as Label
+	if label != null:
+		label.text = "AUDIO OFFSET  %+.2fs" % audio_offset
+
+
 func _pause() -> void:
 	if _paused or _finished:
 		return
@@ -1085,6 +1177,12 @@ func _pause() -> void:
 		_drag_y[i] = 0.0
 	_slider.set_value_no_signal(scroll_speed_multiplier)
 	_speed_value.text = "SCROLL SPEED  %.1f" % scroll_speed_multiplier
+	var offset_slider := _pause_panel.find_child("OffsetSlider", true, false) as HSlider
+	if offset_slider != null:
+		offset_slider.set_value_no_signal(audio_offset)
+	var offset_label := _pause_panel.find_child("OffsetLabel", true, false) as Label
+	if offset_label != null:
+		offset_label.text = "AUDIO OFFSET  %+.2fs" % audio_offset
 	_pause_panel.visible = true
 
 
@@ -1314,20 +1412,5 @@ func _make_disc_texture(size_px: int) -> ImageTexture:
 			var a := 0.0
 			if d <= 1.0:
 				a = (1.0 - smoothstep(0.78, 1.0, d)) * (0.65 + 0.35 * (1.0 - d))
-			img.set_pixel(x, y, Color(1, 1, 1, clampf(a, 0.0, 1.0)))
-	return ImageTexture.create_from_image(img)
-
-
-func _make_ring_texture(size_px: int) -> ImageTexture:
-	var img := Image.create(size_px, size_px, false, Image.FORMAT_RGBA8)
-	var r := float(size_px) * 0.5
-	for y in size_px:
-		for x in size_px:
-			var dx := float(x) + 0.5 - r
-			var dy := float(y) + 0.5 - r
-			var d := sqrt(dx * dx + dy * dy) / r
-			var a := 0.0
-			if d <= 1.0:
-				a = smoothstep(0.66, 0.74, d) * (1.0 - smoothstep(0.92, 1.0, d))
 			img.set_pixel(x, y, Color(1, 1, 1, clampf(a, 0.0, 1.0)))
 	return ImageTexture.create_from_image(img)

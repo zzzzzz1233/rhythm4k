@@ -9,6 +9,7 @@ extends Node2D
 
 var lane_color := Color("#4f8cff")
 var hold_seconds := 0.0
+var mirror := false
 
 var _body: Sprite2D
 var _core: Sprite2D
@@ -27,6 +28,7 @@ func _ready() -> void:
 	_tail = $Tail
 	_build_tail_nodes()
 	_build_fallback_textures()
+	_body.flip_h = mirror
 	_apply_look()
 	_apply_size()
 	_hide_tail_now()
@@ -37,6 +39,21 @@ func setup(color: Color, hold: float) -> void:
 	hold_seconds = hold
 	if is_node_ready():
 		_apply_look()
+
+
+func set_note_texture(tex: Texture2D) -> void:
+	note_texture = tex
+	if _body == null:
+		return
+	_body.texture = tex if tex != null else _cached_disc
+	_apply_look()
+	_apply_size()
+
+
+func set_mirror(on: bool) -> void:
+	mirror = on
+	if _body != null:
+		_body.flip_h = on
 
 
 func set_note_diameter(px: float) -> void:
@@ -102,7 +119,10 @@ func hide_tail_immediate() -> void:
 func set_hold_glow(on: bool) -> void:
 	if _body == null:
 		return
-	_body.modulate = lane_color.lightened(0.25) if on else lane_color
+	if note_texture != null:
+		_body.modulate = Color(1.35, 1.35, 1.35) if on else Color.WHITE
+	else:
+		_body.modulate = lane_color.lightened(0.25) if on else lane_color
 
 
 func _hide_tail_now() -> void:
@@ -118,7 +138,12 @@ func _hide_tail_now() -> void:
 func _apply_look() -> void:
 	if _body == null:
 		return
-	_body.modulate = lane_color
+	if note_texture != null:
+		_body.modulate = Color.WHITE
+		_core.visible = false
+	else:
+		_body.modulate = lane_color
+		_core.visible = true
 	_core.modulate = core_color
 
 
