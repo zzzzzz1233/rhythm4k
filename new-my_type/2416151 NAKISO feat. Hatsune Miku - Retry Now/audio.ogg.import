@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://crx2q2yv705r4"
+path="res://.godot/imported/audio.ogg-87fc0d31aa3617b8b49ba1a421e5257d.oggvorbisstr"
+
+[deps]
+
+source_file="res://new-my_type/2416151 NAKISO feat. Hatsune Miku - Retry Now/audio.ogg"
+dest_files=["res://.godot/imported/audio.ogg-87fc0d31aa3617b8b49ba1a421e5257d.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

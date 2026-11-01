@@ -1,0 +1,88 @@
+[
+  {
+    "folder": "2416151 NAKISO feat. Hatsune Miku - Retry Now",
+    "title": "いますぐ輪廻",
+    "artist": "なきそ feat. 初音ミク",
+    "audio": "audio.ogg",
+    "difficulties": [
+      {
+        "name": "Easy",
+        "stars": 1,
+        "notes_count": 478
+      },
+      {
+        "name": "Normal",
+        "stars": 2,
+        "notes_count": 606
+      },
+      {
+        "name": "Advanced",
+        "stars": 3,
+        "notes_count": 753
+      },
+      {
+        "name": "Kori's Hard",
+        "stars": 4,
+        "notes_count": 1114
+      },
+      {
+        "name": "Duckys' Rebirth",
+        "stars": 5,
+        "notes_count": 1446
+      }
+    ]
+  },
+  {
+    "folder": "2593224 Sound piercer feat. DAZBEE - Hanatachi ni Kibou o (2020 Remaster)",
+    "title": "花たちに希望を (2020 Remaster)",
+    "artist": "Sound piercer feat. DAZBEE",
+    "audio": "audio.ogg",
+    "difficulties": [
+      {
+        "name": "Beginner",
+        "stars": 1,
+        "notes_count": 273
+      },
+      {
+        "name": "Easy",
+        "stars": 2,
+        "notes_count": 502
+      },
+      {
+        "name": "Normal",
+        "stars": 2,
+        "notes_count": 888
+      },
+      {
+        "name": "Karin's Expert",
+        "stars": 3,
+        "notes_count": 2030
+      },
+      {
+        "name": "ZTactix's Advanced",
+        "stars": 3,
+        "notes_count": 1100
+      },
+      {
+        "name": "lik_0's Hyper",
+        "stars": 3,
+        "notes_count": 1303
+      },
+      {
+        "name": "Initial's Insane",
+        "stars": 4,
+        "notes_count": 1579
+      },
+      {
+        "name": "Subsolar Inflorescence",
+        "stars": 4,
+        "notes_count": 2222
+      },
+      {
+        "name": "Bandusty's Another",
+        "stars": 5,
+        "notes_count": 1751
+      }
+    ]
+  }
+]

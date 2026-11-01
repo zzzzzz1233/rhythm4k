@@ -1,0 +1,33 @@
+# Godot
+.godot/
+*.translation
+export_presets.cfg
+export_credentials.cfg
+
+# Local tooling
+.gdmcp/
+
+# Builds
+*.apk
+*.aab
+*.idsig
+build/
+_codex_output/
+
+# Secrets / keys
+*.jks
+*.keystore
+*.p12
+*.pem
+.env
+
+# Large audio assets (add your own locally)
+new-my_type/**/audio.ogg
+*.ogg
+*.wav
+*.mp3
+*.flac
+
+# OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://qfb54sxyscw4"
+path="res://.godot/imported/audio.ogg-8323cd0474eae4c7f7cf06409010b52a.oggvorbisstr"
+
+[deps]
+
+source_file="res://new-my_type/2593224 Sound piercer feat. DAZBEE - Hanatachi ni Kibou o (2020 Remaster)/audio.ogg"
+dest_files=["res://.godot/imported/audio.ogg-8323cd0474eae4c7f7cf06409010b52a.oggvorbisstr"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
